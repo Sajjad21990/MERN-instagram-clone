@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import {
   Box,
   Flex,
@@ -18,6 +19,11 @@ import {
   Icon,
   useColorMode,
   Heading,
+  Input,
+  InputGroup,
+  InputRightElement,
+  Text,
+  Center,
 } from "@chakra-ui/react";
 import {
   HamburgerIcon,
@@ -25,14 +31,18 @@ import {
   BellIcon,
   MoonIcon,
   SunIcon,
+  SearchIcon,
+  SmallCloseIcon,
 } from "@chakra-ui/icons";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useHistory, useLocation } from "react-router-dom";
 import { ImHome } from "react-icons/im";
 import { SiGooglemessages } from "react-icons/si";
 import { FaRegCompass } from "react-icons/fa";
 import Logo from "../assets/images/logo.png";
 import { useDispatch, useSelector } from "react-redux";
 import { logout } from "../redux/actions/authActions";
+import { getData } from "../utils/fetchData";
+import { GLOBAL_TYPES } from "../redux/actions/globalTypes";
 
 const Links = [
   {
@@ -43,7 +53,7 @@ const Links = [
   {
     label: "Message",
     icon: SiGooglemessages,
-    path: "/message",
+    path: "/messages",
   },
   {
     label: "Discover",
@@ -73,13 +83,38 @@ const NavLink = ({ children, path }) => (
 );
 
 export default function Simple() {
+  const [searchText, setSearchText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [searchMenuOpen, setSearchMenuOpen] = useState(false);
+
   const { auth } = useSelector((state) => state);
 
   const dispatch = useDispatch();
   const { pathname } = useLocation();
+  const history = useHistory();
 
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { colorMode, toggleColorMode } = useColorMode();
+
+  useEffect(() => {
+    if (searchText && auth.token) {
+      getData(`/user/search?username=${searchText}`, auth.token)
+        .then((res) => {
+          setUsers(res.data.users);
+          setSearchMenuOpen(true);
+        })
+        .catch((err) => {
+          console.error(err.response.data.msg);
+          dispatch({
+            type: GLOBAL_TYPES.ALERT,
+            payload: { error: err.response.data.msg },
+          });
+        });
+    } else {
+      setUsers([]);
+    }
+  }, [searchText, auth.token, dispatch]);
 
   const isActive = (pn) => {
     if (pn === pathname) return true;
@@ -89,6 +124,25 @@ export default function Simple() {
 
   const handleLogout = () => {
     dispatch(logout());
+  };
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setSearchMenuOpen(true);
+    console.log(searchText);
+  };
+
+  const handleSearchClose = (e) => {
+    e.preventDefault();
+    setSearchMenuOpen(false);
+    setUsers([]);
+    setSearchText("");
+  };
+
+  const handleSearchListClick = (id) => {
+    setSearchMenuOpen(false);
+    setSearchText("");
+    history.push(`/profile/${id}`);
   };
 
   return (
@@ -112,6 +166,73 @@ export default function Simple() {
               />
             </Box>
           </HStack>
+          <Box display={{ base: "none", md: "block" }} w={"40vw"}>
+            <form onSubmit={handleSearch}>
+              <InputGroup size="md">
+                <Input
+                  pr="4.5rem"
+                  type={"text"}
+                  placeholder="Search..."
+                  borderColor="teal"
+                  onChange={(e) =>
+                    setSearchText(
+                      e.target.value.toLowerCase().replace(/ /g, "")
+                    )
+                  }
+                />
+                <InputRightElement>
+                  <IconButton
+                    isLoading={loading}
+                    variant="outline"
+                    colorScheme="teal"
+                    borderLeftRadius="none"
+                    aria-label="Search"
+                    onClick={(e) =>
+                      searchMenuOpen ? handleSearchClose(e) : handleSearch(e)
+                    }
+                    icon={searchMenuOpen ? <SmallCloseIcon /> : <SearchIcon />}
+                  />
+                </InputRightElement>
+              </InputGroup>
+            </form>
+            <Menu isOpen={searchMenuOpen} isLazy colorScheme="teal">
+              <MenuList
+                w="40vw"
+                borderTopRadius="none"
+                borderColor="teal"
+                borderTopColor="transparent"
+              >
+                {users.length > 0 ? (
+                  <>
+                    {users.map((user) => (
+                      <MenuItem
+                        minH="48px"
+                        key={user._id}
+                        onClick={() => handleSearchListClick(user._id)}
+                      >
+                        <Image
+                          boxSize="2rem"
+                          borderRadius="full"
+                          src={user.avatar}
+                          alt={user.fullName}
+                          mr="12px"
+                        />
+                        <Text>
+                          {user.fullName} <br />
+                          <span style={{ fontSize: "0.7rem" }}>
+                            {user.userName}
+                          </span>
+                        </Text>
+                      </MenuItem>
+                    ))}
+                  </>
+                ) : (
+                  <Center>No users found</Center>
+                )}
+              </MenuList>
+            </Menu>
+          </Box>
+
           <Flex alignItems={"center"}>
             <Stack
               flex={{ base: 1, md: 0 }}
@@ -240,6 +361,76 @@ export default function Simple() {
                   {colorMode === "light" ? "Dark Mode" : "Light Mode"}
                 </Heading>
               </Flex>
+              <Box display={{ md: "none" }} w={"90vw"}>
+                <form onSubmit={handleSearch}>
+                  <InputGroup size="md">
+                    <Input
+                      pr="4.5rem"
+                      type={"text"}
+                      placeholder="Search..."
+                      borderColor="teal"
+                      onChange={(e) =>
+                        setSearchText(
+                          e.target.value.toLowerCase().replace(/ /g, "")
+                        )
+                      }
+                    />
+                    <InputRightElement>
+                      <IconButton
+                        isLoading={loading}
+                        variant="outline"
+                        colorScheme="teal"
+                        borderLeftRadius="none"
+                        aria-label="Search"
+                        onClick={(e) =>
+                          searchMenuOpen
+                            ? handleSearchClose(e)
+                            : handleSearch(e)
+                        }
+                        icon={
+                          searchMenuOpen ? <SmallCloseIcon /> : <SearchIcon />
+                        }
+                      />
+                    </InputRightElement>
+                  </InputGroup>
+                </form>
+                <Menu isOpen={searchMenuOpen} isLazy colorScheme="teal">
+                  <MenuList
+                    w="90vw"
+                    borderTopRadius="none"
+                    borderColor="teal"
+                    borderTopColor="transparent"
+                  >
+                    {users.length > 0 ? (
+                      <>
+                        {users.map((user) => (
+                          <MenuItem
+                            minH="48px"
+                            key={user._id}
+                            onClick={() => handleSearchListClick(user._id)}
+                          >
+                            <Image
+                              boxSize="2rem"
+                              borderRadius="full"
+                              src={user.avatar}
+                              alt={user.fullName}
+                              mr="12px"
+                            />
+                            <Text>
+                              {user.fullName} <br />
+                              <span style={{ fontSize: "0.7rem" }}>
+                                {user.userName}
+                              </span>
+                            </Text>
+                          </MenuItem>
+                        ))}
+                      </>
+                    ) : (
+                      <Center>No users found</Center>
+                    )}
+                  </MenuList>
+                </Menu>
+              </Box>
             </Stack>
           </Box>
         ) : null}
